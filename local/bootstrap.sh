@@ -27,7 +27,7 @@ kubectl cluster-info --context "kind-${CLUSTER_NAME}" >/dev/null
 
 echo "==> installing Argo CD"
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-kubectl apply -n argocd \
+kubectl apply --server-side -n argocd \
   -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
 
 echo "==> waiting for Argo CD to become ready (this takes a few minutes on ARM)"
