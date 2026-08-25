@@ -12,7 +12,7 @@ spec:
   description: Regulated delivery platform - node-monitor across dev, qual and prod
 
   sourceRepos:
-    - git@github.com:YOUR-USERNAME/gxp-gitops-platform.git
+    - https://github.com/nithinskanda711/gxp-gitops-platform.git
 
   destinations:
     - server: https://kubernetes.default.svc

@@ -10,7 +10,7 @@ metadata:
 spec:
   project: regulated-delivery
   source:
-    repoURL: git@github.com:YOUR-USERNAME/gxp-gitops-platform.git
+    repoURL: https://github.com/nithinskanda711/gxp-gitops-platform.git
     targetRevision: main
     path: gitops/apps
     directory:
