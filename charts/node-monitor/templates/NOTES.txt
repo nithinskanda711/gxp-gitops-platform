@@ -1,0 +1,8 @@
+node-monitor deployed to {{ .Values.release.environment }}.
+
+  image:      {{ .Values.image.repository }}:{{ .Values.image.tag }}
+  change-ref: {{ .Values.release.changeRef }}
+  replicas:   {{ .Values.replicaCount }}
+
+Reach it with:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "node-monitor.fullname" . }} 8080:{{ .Values.service.port }}

@@ -1,0 +1,8 @@
+region      = "eu-west-1"
+project     = "gxp"
+environment = "lab"
+owner       = "your-name-here"
+
+# Two t4g.medium nodes is enough for Argo CD plus the workload.
+node_instance_types = ["t4g.medium"]
+node_desired_size   = 2

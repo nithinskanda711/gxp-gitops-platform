@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: node-monitor-qual
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: regulated-delivery
+  source:
+    repoURL: git@github.com:YOUR-USERNAME/gxp-gitops-platform.git
+    targetRevision: main
+    path: charts/node-monitor
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-qual.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: node-monitor-qual
+  # No automated block: promotion into qual is a deliberate human action.
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,65 @@
+# Defaults shared by every environment. Environment files override only what
+# actually differs, so a diff between qual and prod is short enough to review.
+
+replicaCount: 1
+
+image:
+  repository: node-monitor
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+# Provenance carried on every pod. Phase 2 makes change-ref mandatory via a
+# Kyverno policy; Phase 4 reads these labels when assembling the evidence bundle.
+release:
+  environment: dev
+  changeRef: "unset"
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+serviceAccount:
+  create: true
+  name: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 128Mi
+
+# Kept aligned with the Dockerfile USER directive.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 20
+
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,0 +1,12 @@
+replicaCount: 1
+
+release:
+  environment: dev
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 48Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi

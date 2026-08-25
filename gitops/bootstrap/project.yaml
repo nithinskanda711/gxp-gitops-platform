@@ -1,0 +1,50 @@
+# An AppProject is the first real control in this platform: it constrains which
+# repositories Argo CD will pull from and which namespaces it may write to.
+# Without it, anyone who can create an Application can deploy anything anywhere.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: regulated-delivery
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Regulated delivery platform - node-monitor across dev, qual and prod
+
+  sourceRepos:
+    - git@github.com:YOUR-USERNAME/gxp-gitops-platform.git
+
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: node-monitor-dev
+    - server: https://kubernetes.default.svc
+      namespace: node-monitor-qual
+    - server: https://kubernetes.default.svc
+      namespace: node-monitor-prod
+    - server: https://kubernetes.default.svc
+      namespace: argocd
+
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ServiceAccount
+    - group: ""
+      kind: ConfigMap
+    - group: apps
+      kind: Deployment
+    - group: argoproj.io
+      kind: Application
+
+  # Phase 3 will bind these to real identities. Documented now so the
+  # segregation-of-duties story has somewhere to live.
+  roles:
+    - name: prod-syncer
+      description: May trigger a sync to prod but may not edit the Application
+      policies:
+        - p, proj:regulated-delivery:prod-syncer, applications, sync, regulated-delivery/node-monitor-prod, allow
+        - p, proj:regulated-delivery:prod-syncer, applications, get, regulated-delivery/*, allow

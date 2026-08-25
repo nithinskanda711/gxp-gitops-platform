@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: node-monitor-dev
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: regulated-delivery
+  source:
+    repoURL: git@github.com:YOUR-USERNAME/gxp-gitops-platform.git
+    targetRevision: main
+    path: charts/node-monitor
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: node-monitor-dev
+  # Dev self-heals automatically. Drift here is noise, not a finding.
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: node-monitor-prod
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: regulated-delivery
+  source:
+    repoURL: git@github.com:YOUR-USERNAME/gxp-gitops-platform.git
+    targetRevision: main
+    path: charts/node-monitor
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-prod.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: node-monitor-prod
+  # Manual sync only. selfHeal is deliberately off in Phase 1 so that drift is
+  # visible rather than silently reverted; Phase 5 turns it on and alerts on it.
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
