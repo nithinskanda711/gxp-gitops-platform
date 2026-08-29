@@ -1,0 +1,163 @@
+# Jenkins controller, configured entirely as code.
+#
+# Nothing here is clicked in the UI. The whole point of a regulated pipeline is
+# that the pipeline itself is reproducible, so the controller config, the
+# credentials wiring and the agent pod template all live in Git.
+
+controller:
+  # The controller schedules work; it does not build. Builds happen in
+  # ephemeral agent pods that are created and destroyed per run.
+  resources:
+    requests:
+      cpu: 300m
+      memory: 1024Mi
+    limits:
+      cpu: "1"
+      memory: 2048Mi
+
+  # Lab only. A real deployment puts this behind SSO and never sets a
+  # static password in a values file.
+  adminUser: admin
+  adminPassword: admin
+
+  serviceType: ClusterIP
+
+  installPlugins:
+    - kubernetes:4290.v93ea_4b_b_b_5b_2d
+    - workflow-aggregator:600.vb_57cdd26fdd7
+    - git:5.4.1
+    - configuration-as-code:1836.vccda_4a_122a_a_e
+    - pipeline-stage-view:2.34
+    - credentials-binding:681.vf91669a_32e45
+
+  JCasC:
+    defaultConfig: true
+    configScripts:
+      pod-template: |
+        jenkins:
+          clouds:
+            - kubernetes:
+                name: kind
+                namespace: jenkins
+                jenkinsUrl: http://jenkins.jenkins.svc.cluster.local:8080
+                jenkinsTunnel: jenkins-agent.jenkins.svc.cluster.local:50000
+                containerCapStr: "3"
+                templates:
+                  - name: supply-chain
+                    namespace: jenkins
+                    label: supply-chain
+                    serviceAccount: jenkins
+                    yamlMergeStrategy: override
+                    yaml: |
+                      apiVersion: v1
+                      kind: Pod
+                      spec:
+                        containers:
+                          # Runs the unit tests.
+                          - name: python
+                            image: python:3.12-slim
+                            command: ["cat"]
+                            tty: true
+                            resources:
+                              requests: {cpu: 100m, memory: 256Mi}
+                              limits: {cpu: 500m, memory: 512Mi}
+
+                          # Mints the short-lived ECR token. ECR credentials
+                          # expire after 12 hours, so they are fetched per
+                          # build rather than stored anywhere.
+                          - name: awscli
+                            image: amazon/aws-cli:2.17.0
+                            command: ["cat"]
+                            tty: true
+                            envFrom:
+                              - secretRef:
+                                  name: aws-credentials
+                            volumeMounts:
+                              - name: docker-config
+                                mountPath: /kaniko/.docker
+                            resources:
+                              requests: {cpu: 50m, memory: 128Mi}
+                              limits: {cpu: 300m, memory: 256Mi}
+
+                          # Builds the image without a Docker daemon and
+                          # without privileged access to the node. A socket
+                          # mount would hand every build root on the host.
+                          - name: kaniko
+                            image: gcr.io/kaniko-project/executor:v1.23.2-debug
+                            command: ["/busybox/cat"]
+                            tty: true
+                            volumeMounts:
+                              - name: docker-config
+                                mountPath: /kaniko/.docker
+                            resources:
+                              requests: {cpu: 200m, memory: 512Mi}
+                              limits: {cpu: "1", memory: 1536Mi}
+
+                          - name: syft
+                            image: anchore/syft:v1.11.0
+                            command: ["cat"]
+                            tty: true
+                            volumeMounts:
+                              - name: docker-config
+                                mountPath: /root/.docker
+                            resources:
+                              requests: {cpu: 100m, memory: 256Mi}
+                              limits: {cpu: 500m, memory: 768Mi}
+
+                          - name: trivy
+                            image: aquasec/trivy:0.54.1
+                            command: ["cat"]
+                            tty: true
+                            volumeMounts:
+                              - name: docker-config
+                                mountPath: /root/.docker
+                            resources:
+                              requests: {cpu: 100m, memory: 512Mi}
+                              limits: {cpu: "1", memory: 1024Mi}
+
+                          - name: cosign
+                            image: gcr.io/projectsigstore/cosign:v2.4.0
+                            command: ["cat"]
+                            tty: true
+                            volumeMounts:
+                              - name: docker-config
+                                mountPath: /root/.docker
+                              - name: cosign-key
+                                mountPath: /keys
+                                readOnly: true
+                            env:
+                              - name: COSIGN_PASSWORD
+                                valueFrom:
+                                  secretKeyRef:
+                                    name: cosign-key
+                                    key: password
+                            resources:
+                              requests: {cpu: 100m, memory: 256Mi}
+                              limits: {cpu: 500m, memory: 512Mi}
+
+                        volumes:
+                          # Written at build time by the awscli container and
+                          # discarded when the pod dies.
+                          - name: docker-config
+                            emptyDir: {}
+                          - name: cosign-key
+                            secret:
+                              secretName: cosign-key
+                              items:
+                                - key: cosign.key
+                                  path: cosign.key
+
+persistence:
+  enabled: true
+  size: 4Gi
+
+agent:
+  # Agents come from the pod template above, not from this block.
+  enabled: false
+
+serviceAccount:
+  create: true
+  name: jenkins
+
+rbac:
+  create: true

@@ -1,0 +1,51 @@
+# Change control expressed as an admission rule.
+#
+# Every pod must carry the identifier of the change record that authorised it.
+# "unset" is the chart default, so a deploy that skipped the pipeline - or a
+# hand-edited manifest - fails here rather than passing silently.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-change-ref
+  annotations:
+    policies.kyverno.io/title: Require a change reference
+    policies.kyverno.io/category: Change control
+    policies.kyverno.io/severity: high
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: change-ref-must-be-set
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - node-monitor-qual
+                - node-monitor-prod
+      validate:
+        message: >-
+          Pods in a controlled environment must carry a change-ref label
+          identifying the approved change record. Found "unset" or missing.
+        pattern:
+          metadata:
+            labels:
+              platform.internal/change-ref: "?*"
+    - name: change-ref-must-not-be-placeholder
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - node-monitor-qual
+                - node-monitor-prod
+      validate:
+        message: 'change-ref is still the chart default ("unset").'
+        deny:
+          conditions:
+            all:
+              - key: '{{ request.object.metadata.labels."platform.internal/change-ref" || ''unset'' }}'
+                operator: Equals
+                value: unset

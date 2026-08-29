@@ -1,0 +1,52 @@
+# The control that makes every other control matter.
+#
+# Without this, the pipeline scans and signs images and then the cluster
+# accepts whatever it is told to run. With it, an image that did not come out
+# of the pipeline cannot be admitted - not by a mistake, not by someone with
+# cluster credentials, not by an Argo CD sync pointing at the wrong tag.
+#
+# mutateDigest rewrites the tag to the digest it verified, so what is scheduled
+# is provably the artefact whose signature was checked microseconds earlier.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-signed-images
+  annotations:
+    policies.kyverno.io/title: Verify image signatures
+    policies.kyverno.io/category: Supply chain
+    policies.kyverno.io/severity: critical
+    policies.kyverno.io/description: >-
+      Rejects any node-monitor image that does not carry a valid Cosign
+      signature made by the platform release key.
+spec:
+  validationFailureAction: Enforce
+  background: false
+  webhookTimeoutSeconds: 30
+  failurePolicy: Fail
+  rules:
+    - name: verify-node-monitor-signature
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - node-monitor-dev
+                - node-monitor-qual
+                - node-monitor-prod
+      verifyImages:
+        - imageReferences:
+            - "*.dkr.ecr.*.amazonaws.com/gxp/node-monitor:*"
+            - "*.dkr.ecr.*.amazonaws.com/gxp/node-monitor@*"
+          mutateDigest: true
+          verifyDigest: true
+          required: true
+          attestors:
+            - count: 1
+              entries:
+                - keys:
+                    # Public half of the release key. The private half lives in
+                    # the jenkins namespace and nowhere else.
+                    publicKeys: |-
+                      REPLACE_WITH_COSIGN_PUB
+                    signatureAlgorithm: sha256

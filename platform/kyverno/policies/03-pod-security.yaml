@@ -1,0 +1,76 @@
+# The workload chart already sets all of this. These rules make the settings
+# non-optional: a future edit that quietly drops runAsNonRoot gets rejected
+# instead of shipping. Controls that live only in a values file are conventions;
+# controls enforced at admission are controls.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: workload-baseline
+  annotations:
+    policies.kyverno.io/title: Workload security baseline
+    policies.kyverno.io/category: Workload security
+    policies.kyverno.io/severity: high
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: disallow-latest-tag
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [node-monitor-dev, node-monitor-qual, node-monitor-prod]
+      validate:
+        message: >-
+          An image tagged :latest cannot be traced to a build. Use an explicit
+          version or a digest.
+        pattern:
+          spec:
+            containers:
+              - image: "!*:latest"
+
+    - name: require-non-root
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [node-monitor-dev, node-monitor-qual, node-monitor-prod]
+      validate:
+        message: Containers must run as a non-root user.
+        pattern:
+          spec:
+            =(securityContext):
+              runAsNonRoot: true
+
+    - name: require-resource-limits
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [node-monitor-dev, node-monitor-qual, node-monitor-prod]
+      validate:
+        message: Every container must declare CPU and memory limits.
+        pattern:
+          spec:
+            containers:
+              - resources:
+                  limits:
+                    cpu: "?*"
+                    memory: "?*"
+
+    - name: drop-all-capabilities
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [node-monitor-dev, node-monitor-qual, node-monitor-prod]
+      validate:
+        message: Containers must drop ALL capabilities and disallow privilege escalation.
+        pattern:
+          spec:
+            containers:
+              - securityContext:
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                      - ALL

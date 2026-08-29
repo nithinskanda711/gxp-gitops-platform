@@ -26,10 +26,10 @@ deliberately uninteresting. The platform is the deliverable.
 | 4 | Evidence bundles signed and written to immutable S3 | planned |
 | 5 | Prometheus/Grafana, DORA metrics, drift alerting | planned |
 
-Phase 1 establishes the spine. Nothing is signed or enforced yet — those are
-Phase 2 — but the structure that Phase 2 hangs off is in place, and the pod
-security posture and provenance labels are already correct so that turning on
-admission policies later does not require rewriting the chart.
+Phase 1 established the spine: the cluster reconciles to Git. Phase 2 makes the
+*artefact* trustworthy — images are built without a Docker socket, scanned,
+signed, and verified cryptographically at admission. See `docs/phase-2.md` for
+the runbook.
 
 ---
 
@@ -121,9 +121,15 @@ app/                     Flask + psutil workload, Dockerfile, unit tests
 charts/node-monitor/     one chart, values.yaml + values-{dev,qual,prod}.yaml
 gitops/bootstrap/        AppProject and the app-of-apps root Application
 gitops/apps/             one Argo CD Application per environment
-infra/terraform/         VPC, EKS, ECR (immutable tags, scan on push)
+infra/terraform/ecr/     the registry — cheap, always on
+infra/terraform/eks/     the cluster — expensive, create and destroy same day
+platform/jenkins/        controller config as code, Kaniko agent pod template
+platform/kyverno/        admission policies and the release public key
+Jenkinsfile              build → SBOM → scan → sign → verify
+scripts/                 cosign key generation
 local/                   kind cluster config and the bootstrap script
 docs/control-matrix.md   each control, the risk it addresses, its current state
+docs/phase-2.md          supply-chain runbook
 ```
 
 `make help` lists every target.
@@ -150,6 +156,20 @@ can create an Application in the `argocd` namespace can deploy anything from
 anywhere to any namespace. Constraining `sourceRepos` and `destinations` is the
 difference between GitOps and "a thing that applies YAML".
 
+**Kaniko, not a mounted Docker socket.** Almost every Jenkins-on-Kubernetes
+tutorial mounts `/var/run/docker.sock` into the build agent. That hands every
+build root on the node. In a repository about regulated delivery it would be
+the loudest thing in the diff.
+
+**Signing happens after the scan, and signs the digest.** A signature can only
+exist for an image that passed the gate, and a digest cannot be repointed the
+way a tag can. Scanning one artefact and deploying another is the specific
+failure this ordering prevents.
+
+**`failurePolicy: Fail` on the signature policy.** If Kyverno cannot reach the
+registry to check a signature, the pod is rejected. A verification control that
+fails open is not a control.
+
 ---
 
 ## Known gaps
@@ -162,4 +182,11 @@ Documented rather than hidden — see `docs/control-matrix.md` for the full list
   locking.
 - Argo CD RBAC roles are declared in the AppProject but not yet bound to real
   identities — that arrives with the Phase 3 SSO integration.
-- Nothing is signed or verified yet. That is the entire point of Phase 2.
+- Jenkins holds static AWS keys in a Secret. On real EKS this would be IRSA and
+  there would be no long-lived credential to leak.
+- The base image is pinned by tag rather than digest, so it can drift between a
+  scan and a later rebuild.
+- The verified digest still reaches the values file by hand. Phase 3 automates
+  the write-back with an approval gate in front of it.
+- SBOMs and scan reports are Jenkins artefacts — mutable and expiring. Phase 4
+  turns them into signed bundles in immutable storage.

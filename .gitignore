@@ -15,3 +15,11 @@ crash.log
 *.bak
 .DS_Store
 kubeconfig*
+
+# Cosign private key. The public half is committed under platform/kyverno/.
+.keys/
+*.key
+!platform/kyverno/cosign.pub
+
+# Terraform state lives per-stack now
+**/.terraform/

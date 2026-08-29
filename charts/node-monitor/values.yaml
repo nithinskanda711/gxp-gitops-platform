@@ -6,6 +6,10 @@ replicaCount: 1
 image:
   repository: node-monitor
   tag: "0.1.0"
+  # Set by the pipeline. When present it wins over tag, because a digest is the
+  # content and a tag is only a pointer to it. Kyverno verifies the signature
+  # against whatever ends up here.
+  digest: ""
   pullPolicy: IfNotPresent
 
 # Provenance carried on every pod. Phase 2 makes change-ref mandatory via a
