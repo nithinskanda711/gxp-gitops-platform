@@ -48,5 +48,8 @@ spec:
                     # Public half of the release key. The private half lives in
                     # the jenkins namespace and nowhere else.
                     publicKeys: |-
-                      REPLACE_WITH_COSIGN_PUB
+                      -----BEGIN PUBLIC KEY-----
+                      MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEI7kOUQYdEQLBl1939d3QetxX685D
+                      lGE6C04e4Z9mJOMHIYx0GZ9kqQ6WeAZ31+crYnRw7nG2SoCGjDgTWR4QrQ==
+                      -----END PUBLIC KEY-----
                     signatureAlgorithm: sha256
