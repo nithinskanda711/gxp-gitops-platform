@@ -93,10 +93,17 @@ controller:
                               requests: {cpu: 200m, memory: 512Mi}
                               limits: {cpu: "1", memory: 1536Mi}
 
+                          # The -debug tags matter. The default syft and cosign
+                          # images are shell-less (scratch / distroless), and
+                          # Jenkins drives every step through `sh` — against
+                          # those images each step exits 127, command not found.
                           - name: syft
-                            image: anchore/syft:v1.11.0
-                            command: ["cat"]
+                            image: anchore/syft:v1.11.0-debug
+                            command: ["/busybox/cat"]
                             tty: true
+                            env:
+                              - name: DOCKER_CONFIG
+                                value: /root/.docker
                             volumeMounts:
                               - name: docker-config
                                 mountPath: /root/.docker
@@ -116,9 +123,13 @@ controller:
                               limits: {cpu: "1", memory: 1024Mi}
 
                           - name: cosign
-                            image: gcr.io/projectsigstore/cosign:v2.4.0
-                            command: ["cat"]
+                            image: gcr.io/projectsigstore/cosign:v2.4.0-dev
+                            command: ["/busybox/cat"]
                             tty: true
+                            # The -dev image defaults to uid 65532, which cannot
+                            # read /root/.docker or write the shared workspace.
+                            securityContext:
+                              runAsUser: 0
                             volumeMounts:
                               - name: docker-config
                                 mountPath: /root/.docker
@@ -126,6 +137,8 @@ controller:
                                 mountPath: /keys
                                 readOnly: true
                             env:
+                              - name: DOCKER_CONFIG
+                                value: /root/.docker
                               - name: COSIGN_PASSWORD
                                 valueFrom:
                                   secretKeyRef:
@@ -146,6 +159,11 @@ controller:
                               items:
                                 - key: cosign.key
                                   path: cosign.key
+                                # The Verify stage reads /keys/cosign.pub. The
+                                # Secret carries it; without this item it never
+                                # reaches the pod.
+                                - key: cosign.pub
+                                  path: cosign.pub
 
 persistence:
   enabled: true

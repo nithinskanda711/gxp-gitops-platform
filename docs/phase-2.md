@@ -206,6 +206,15 @@ that you pushed after `make cosign-keys`.
 `make kyverno-refresh-creds`. On real EKS this would be IRSA; it is a gap, and
 it is in the control matrix as one.
 
+**`script returned exit code 127`** in the SBOM, Sign or Verify stage — 127 is
+"command not found", and the command not found is the *shell*. The stock `syft`
+and `cosign` images are scratch and distroless respectively: no `/bin/sh`, no
+`cat`. Jenkins drives every step through `sh`, so those stages cannot run at all.
+Use the `-debug` / `-dev` tags, which are busybox-based, and set the container
+`command` to `/busybox/cat`. Anything you add to the pod template needs a shell
+in it — check with
+`docker run --rm --entrypoint sh <image> -c true` before wiring it in.
+
 **Kaniko cannot push** — the `Registry auth` stage writes the token to a shared
 `emptyDir`. If the token was minted more than 12 hours before the push, re-run
 the build rather than debugging the layers.
